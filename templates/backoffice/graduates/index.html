@@ -1,23 +1,21 @@
-{% extends 'backoffice/base.html' %}
+{% extends 'backoffice/base-adminlte.html' %}
 {% load form_tags %}
 
-{% block content-dashboard %}
-<div class="container">
-    <div class="alert alert-info pt-4 pb-4" role="alert">
-        <h3 class="alert-heading">Perhatian !</h3>
-        <p>Anda dapat melihat daftar peserta yang udah memenuhi indikator kelulusan dengan klik tombol di bawah ini</p>
-        <a href="{% url 'backoffice:graduates:candidates' %}" class="btn btn-secondary">Lihat data</a>
-    </div>
-
+{% block content %}
+<div class="col-md-12">
     <div class="card">
         <div class="card-header">
             <h4 class="pull-left">{{ title }}</h4>
-            <form method="GET" >
-                <button name="download" value="true" class="btn btn-secondary btn-pill pull-right">Unduh</button>
-            </form>
+        </div>
+        <div class="card-body">
+            {% include 'forms/filter.html' %}
         </div>
         <div class="card-body">
             {% if graduates %}
+            <p>
+                Total data <span class="badge badge-primary">{{ graduates_count }}</span>
+                Total penyaringan <span class="badge badge-info">{{ filter_count }}</span>
+            </p>
             <div class="datatable content table-responsive table-full-width">
                 <table id="datatable" class="table table-striped">
                     <thead>
@@ -25,7 +23,7 @@
                         <th>Name</th>
                         <th>No. Sertifikat</th>
                         <th>Email</th>
-                        <th>No. Ponsel</th>
+                        <th>Tersalurkan</th>
                         <th>Aksi</th>
                     </thead>
                     <tbody>
@@ -35,7 +33,12 @@
                                 <td>{{ graduate.user.name }}</td>
                                 <td>{{ graduate.certificate_number|default:'-' }}</td>
                                 <td>{{ graduate.user.email }}</td>
-                                <td>{{ graduate.user.phone|default_if_none:"-" }}</td>
+                                <td>
+                                    <label class="custom-control custom-toggle d-block my-2">
+                                        <input type="checkbox" data-id="{{ graduate.id }}" class="custom-control-input toggleChanneled" required {{ graduate.is_channeled|yesno:'checked, '}}>
+                                        <span class="custom-control-indicator"></span>
+                                    </label>
+                                </td>
                                 <td>
                                     <a href="{% url 'backoffice:graduates:details' graduate.id %}">Detail</a>
                                 </td>
@@ -98,4 +101,45 @@
         <div class="card-footer"></div>
     </div>
 </div>
+
+
+{% url 'backoffice:graduates:change_is_channeled' as form_action %}
+{% include 'backoffice/common/simple-form-modal.html' with id="channeledFormModal" title="Lulusan Tersalurkan" form=channeled_form action=form_action %}
+
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    /*
+        switch toggle to change change status channeled
+
+        - if switch on, then show modal form and enter campany name then POST data to save
+          is_channeled to True and channeled_at
+        - if switch off, hit api for change is_channeled to False and channeled_at to empty string
+    */
+    $('.toggleChanneled').change(function() {
+        $toggleSelected = $(this)
+        Id = $toggleSelected.data("id");
+        $('#id_graduate_id').val(Id);
+        if(this.checked) {
+            $('#channeledFormModal').modal('show')
+            $('#channeledFormModal').on('hidden.bs.modal', function () {
+                $toggleSelected.prop("checked", false);
+            });
+            return;
+        }
+        else {
+            $.ajax({
+                url: "{% url 'backoffice:graduates:change_is_channeled' %}",
+                data: {'id': Id},
+                dataType: 'json',
+                error:function (xhr, ajaxOptions, thrownError){
+                    alert(thrownError);
+                }
+            });
+        }
+    });
+
+</script>
 {% endblock %}

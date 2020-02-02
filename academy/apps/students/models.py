@@ -1,4 +1,5 @@
 from django.db import models
+from django.core.cache import cache
 from django.db.models import Q
 from django.conf import settings
 from django.utils.translation import ugettext_lazy as _
@@ -56,6 +57,8 @@ class Student(models.Model):
         return self.user.email
 
     def notification_status(self):
+        from academy.apps.accounts.models import Inbox
+        
         if self.status == self.STATUS.participants:
             template = 'emails/change_to_participant.html'
             title = 'Selamat, Anda menjadi peserta'
@@ -74,13 +77,20 @@ class Student(models.Model):
             'indicator': settings.INDICATOR_GRADUATED
         }
 
+        html_message=render_to_string(template, context=data)
+        Inbox.objects.create(user=self.user, subject=title, content=html_message)
+
         send = mail.send(
             [self.user.email],
             settings.DEFAULT_FROM_EMAIL,
             subject=title,
-            html_message=render_to_string(template, context=data)
+            html_message=html_message
         )
         return send
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        cache.delete(f'student-{self.user.id}')
 
 
 class TrainingMaterial(models.Model):

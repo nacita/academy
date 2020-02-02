@@ -79,6 +79,13 @@ class ProfileForm(forms.ModelForm):
             'telegram_id': ('contoh "@namaanda"'),
         }
 
+    def __init__(self, cv_required=True, *args, **kwargs):
+        # cv_required is argument to create optional this form required cv or not
+        # by default cv_required is True
+        self.cv_required = cv_required
+        super().__init__(*args, **kwargs)
+        self.fields['curriculum_vitae'].required = self.cv_required
+
     def clean_telegram_id(self):
         telegram_id = self.cleaned_data['telegram_id']
         if not telegram_id:
@@ -89,13 +96,12 @@ class ProfileForm(forms.ModelForm):
         return telegram_id
 
     def save(self, user, *args, **kwargs):
-        user.first_name = self.cleaned_data['first_name']
-        user.last_name = self.cleaned_data['last_name']
-        user.phone = self.cleaned_data['phone_number']
-        user.save()
-
         profile = super().save(commit=False)
         profile.user = user
+        profile.user.first_name = self.cleaned_data['first_name']
+        profile.user.last_name = self.cleaned_data['last_name']
+        profile.user.phone = self.cleaned_data['phone_number']
+        profile.user.save()
         profile.save()
 
         return profile
@@ -184,7 +190,15 @@ class SurveyForm(forms.ModelForm):
 
     def save(self, user, *args, **kwargs):
         survey = super().save(commit=False)
-        survey.user = user
+        if not hasattr(survey, 'user'):
+            survey.user = user
+
         survey.save()
 
         return survey
+
+
+class AvatarForm(forms.ModelForm):
+    class Meta:
+        model = Profile
+        fields = ['avatar']

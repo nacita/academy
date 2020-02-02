@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/1.11/ref/settings/
 
 import os
 import sentry_sdk
+
+from datetime import timedelta
 from sentry_sdk.integrations.django import DjangoIntegration
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
@@ -36,6 +38,7 @@ ALLOWED_HOSTS = ['*']
 
 # do not mark / at the end of the host
 HOST = 'http://academy.btech.id'
+MEDIA_HOST = HOST
 
 # Application definition
 
@@ -60,6 +63,7 @@ INSTALLED_APPS = [
     'post_office',
     'django_extensions',
     'qr_code',
+    'rest_framework',
 
 ]
 
@@ -141,6 +145,10 @@ EMAIL_USE_TLS = True
 EMAIL_PORT = 587
 DEFAULT_RECIPIANT_EMAIL = 'contact@btech.id'
 
+POST_OFFICE = {
+    'BATCH_SIZE': 100
+}
+
 # Internationalization
 # https://docs.djangoproject.com/en/1.11/topics/i18n/
 
@@ -173,6 +181,12 @@ sentry_sdk.init(
     dsn="https://c9a271a3699648e18769f6370f4d7488@sentry.io/1339389",
     integrations=[DjangoIntegration()]
 )
+
+# JWT Config
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=3),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+}
 
 try:
     from .local_settings import *

@@ -1,15 +1,16 @@
-from django.contrib.auth import login, logout
+from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils.http import base36_to_int
 from django.contrib.auth.tokens import default_token_generator
 from django.http import Http404
-from django.contrib.auth.forms import SetPasswordForm
+from django.contrib.auth.forms import SetPasswordForm, PasswordChangeForm
 
-from academy.apps.accounts.models import User
+from academy.apps.accounts.models import User, Inbox
 from academy.apps.students.models import Training, Student
-from .forms import CustomAuthenticationForm, SignupForm, ProfileForm, StudentForm, ForgotPasswordForm, SurveyForm
+from .forms import CustomAuthenticationForm, SignupForm, ProfileForm, StudentForm, ForgotPasswordForm, SurveyForm, \
+    AvatarForm
 
 
 @login_required
@@ -18,7 +19,10 @@ def index(request):
         return redirect("website:accounts:survey")
 
     user = request.user
-    training = Training.objects.filter(is_active=True).order_by('batch').last()
+    training = Training.objects.filter(is_active=True) \
+        .exclude(batch__contains='NSC').order_by('batch').last()
+    if not training:
+        training = Training.objects.create(batch="0")
 
     if hasattr(user, 'profile'):
         student = request.user.get_student()
@@ -31,11 +35,12 @@ def index(request):
         context = {
             'title': 'Dasbor',
             'student': student,
-            'graduate': graduate
+            'graduate': graduate,
+            'menu_active': 'dashboard'
         }
         return render(request, 'dashboard/index.html', context)
 
-    form = ProfileForm(request.POST or None, request.FILES or None)
+    form = ProfileForm(data=request.POST or None, files=request.FILES or None)
     if form.is_valid():
         form.save(user)
         form_student = StudentForm(data={'user': user.id, 'training': training.id})
@@ -86,7 +91,7 @@ def sign_up(request):
     form = SignupForm(request.POST or None)
     if form.is_valid():
         form.save()
-        messages.success(request, 'Mohon cek email Anda untuk mengaktifkan akun')
+        messages.success(request, 'Mohon cek kotak masuk/spam pada email Anda untuk mengaktifkan akun')
         return redirect('website:accounts:sign_up')
 
     context = {
@@ -107,8 +112,13 @@ def active_account(request, uidb36, token):
     if user and default_token_generator.check_token(user, token):
         user.is_active = True
         user.save(update_fields=['is_active'])
-        login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+
+        # TODO: if registered via mobile, auth login into mobile app
         messages.success(request, 'Selamat, akun Anda sudah aktif')
+        if user.registered_via == User.VIA.mobile:
+            return redirect("website:index")
+
+        login(request, user, backend='django.contrib.auth.backends.ModelBackend')
     else:
         messages.warning(request, 'Maaf, ada masalah dengan aktivasi akun')
 
@@ -130,13 +140,24 @@ def profile(request):
         survey = user.survey
 
     context = {
-        'title': 'Dashboard',
+        'title': 'Profil',
+        'menu_active': 'profil',
         'user': user,
         'student': student,
         'graduate': graduate,
         'survey': survey
     }
     return render(request, 'dashboard/profile.html', context)
+
+
+@login_required
+def edit_avatar(request):
+    form = AvatarForm(data=request.POST or None, files=request.FILES or None, instance=request.user.profile)
+
+    if form.is_valid():
+        form.save()
+        
+    return redirect("website:accounts:profile")
 
 
 @login_required
@@ -154,14 +175,14 @@ def edit_profile(request):
         'linkedin': user.profile.linkedin,
         'git_repo': user.profile.git_repo,
         'blog': user.profile.blog,
-        'facebook':user.profile.facebook,
+        'facebook': user.profile.facebook,
         'youtube': user.profile.youtube,
         'twitter': user.profile.twitter,
         'instagram': user.profile.instagram
     }
 
-    form = ProfileForm(request.POST or None, request.FILES or None,
-                          initial=initial, instance=user.profile)
+    form = ProfileForm(data=request.POST or None, files=request.FILES or None,
+                       initial=initial, instance=user.profile)
     if form.is_valid():
         form.save(user)
         messages.success(request, 'Profil berhasil diubah')
@@ -174,8 +195,26 @@ def edit_profile(request):
     return render(request, 'dashboard/edit_profile.html', context)
 
 
+@login_required
+def change_password(request):
+    form = PasswordChangeForm(request.user, request.POST or None)
+    if form.is_valid():
+        user = form.save()
+        update_session_auth_hash(request, user)
+        messages.success(request, 'Password berhasil diubah!')
+        return redirect('website:accounts:profile')
+
+    context = {
+        'title': 'Ubah Password',
+        'form': form,
+        'menu_active': 'change_password'
+    }
+    return render(request, 'dashboard/edit_profile.html', context)
+
+
 def forgot_password(request):
     form = ForgotPasswordForm(request.POST or None)
+    navbar = request.GET.get('navbar')
 
     if form.is_valid():
         form.send_email(form.cleaned_data['email'])
@@ -185,12 +224,12 @@ def forgot_password(request):
     context = {
         'title': 'Lupa kata sandi',
         'form': form,
+        'navbar': navbar
     }
     return render(request, 'accounts/form.html', context)
 
 
 def reset_password(request, uidb36, token):
-
     try:
         uid_int = base36_to_int(uidb36)
     except ValueError:
@@ -205,7 +244,7 @@ def reset_password(request, uidb36, token):
             return redirect('website:accounts:login')
     else:
         messages.warning(request, 'Maaf, permintaan atur ulang kata sandi sudah'
-                         'kadaluarsa. Silahkan coba lagi')
+                                  'kadaluarsa. Silahkan coba lagi')
         return redirect('website:accounts:login')
 
     context = {
@@ -267,6 +306,45 @@ def auth_user(request, uidb36, token):
             return redirect("website:accounts:edit_survey")
         else:
             return redirect("website:accounts:survey")
-    
+
     messages.warning(request, 'Maaf link tidak valid')
     return redirect('website:index')
+
+
+@login_required
+def inbox(request):
+    if request.POST :
+        data = request.POST
+        for id in data.getlist('checkMark'):
+            inbox = Inbox.objects.get(id=id)
+            if inbox:
+                if data['action'] == "unread" :
+                    inbox.is_read = False
+                if data['action'] == "read" :
+                    inbox.is_read = True
+                inbox.save()
+
+    user = request.user
+    inboxs = Inbox.objects.filter(user=user).order_by('-sent_date')
+
+    context = {
+        'title': 'Inbox',
+        'menu_active': 'inbox',
+        'inboxs': inboxs
+    }
+    return render(request, 'dashboard/inbox.html', context)
+
+
+@login_required
+def inbox_detail(request, id):
+    inbox = get_object_or_404(Inbox, id=id)
+    if not inbox.is_read:
+        inbox.is_read = True
+        inbox.save()
+
+    context = {
+        'title': 'Detail Inbox',
+        'menu_active': 'inbox',
+        'inbox': inbox
+    }
+    return render(request, 'dashboard/inbox_detail.html', context)

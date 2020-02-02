@@ -1,16 +1,16 @@
-{% extends 'backoffice/base.html' %}
+{% extends 'backoffice/base-adminlte.html' %}
 {% load form_tags %}
 
-{% block content-dashboard %}
+{% block content %}
 <div class="container">
     <div class="card">
         <div class="card-header">
-            <h4 class="pull-left">
+            <h4 class="fa-pull-left">
                 Profil
             </h4>
-            <div class="pull-right">
+            <div class="fa-pull-right">
                 {% if student.status|status_display == 'seleksi' %}
-                    <a class="btn btn-success text-white" href="{% url 'backoffice:users:change_to_participant' user.id %}">Jadikan Peserta</a>
+                    <a class="btn btn-success text-white" data-toggle="modal" data-target="#changeToParticipantModal">Jadikan Peserta</a>
                 {% elif student.status|status_display == 'peserta' %}
                     <a class="btn btn-secondary text-white" href="{% url 'backoffice:users:status_training' user.id %}">Status Pelatihan</a>
                 {% endif %}
@@ -56,14 +56,14 @@
                                             <td class="font-weight-bold">Status</td>
                                             <td>
                                                 {{ student.status|status_display:"True" }}
-                                                <small><a href="{% url 'backoffice:users:edit_status' student.id %}">edit</a></small>
+                                                <small><a href="{% url 'backoffice:users:edit_status' student.id %}"> <i class="fas fa-edit"></i></a></small>
                                             </td>
                                         </tr>
                                         <tr>
                                             <td class="font-weight-bold">Angkatan</td>
                                             <td>
                                                 {{ student.training.batch }}
-                                                <small><a href="{% url 'backoffice:users:edit_student_batch' student.id %}">edit</a></small>
+                                                <small><a href="{% url 'backoffice:users:edit_student_batch' student.id %}"> <i class="fas fa-edit"></i></a></small>
                                             </td>
                                         </tr>
                                         {% if student.campus %}
@@ -176,4 +176,9 @@
         <div class="card-footer"></div>
     </div>
 </div>
+
+{% if student.status|status_display == 'seleksi' %}
+    {% url 'backoffice:users:change_to_participant' user.id as form_action %}
+    {% include 'backoffice/common/simple-form-modal.html' with id="changeToParticipantModal" title="Jadikan Peserta" form=to_participant_form action=form_action %}
+{% endif %}
 {% endblock %}

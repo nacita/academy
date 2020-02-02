@@ -1,21 +1,20 @@
-from django.http import HttpResponse
-from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.forms import formset_factory
+from django.http import HttpResponse
+from django.shortcuts import render, redirect, get_object_or_404
 
-from academy.core.utils import pagination
 from academy.apps.accounts.models import User
-from academy.apps.students.models import Student, TrainingMaterial, Training
-
+from academy.apps.students.models import Student, Training
+from academy.core.utils import pagination
 from .forms import (BaseFilterForm, ParticipantsFilterForm, ChangeStatusTraining,
-                    BaseStatusTrainingFormSet, TrainingForm, StudentForm, ChangeStatusForm)
+                    BaseStatusTrainingFormSet, TrainingForm, StudentForm, ChangeStatusForm, ChangeToParticipantForm)
 
 
 @staff_member_required
 def index(request):
-    user_ids = Student.objects.exclude(status=Student.STATUS.graduate)\
-        .distinct('user_id').values_list('user_id', flat=True)
+    user_ids = Student.objects.exclude(status=Student.STATUS.graduate).filter(campus__isnull=True) \
+        .exclude(user__username='deleted').distinct('user_id').values_list('user_id', flat=True)
     user_list = User.objects.exclude(is_superuser=True).exclude(is_staff=True) \
         .filter(id__in=user_ids)
     user_count = user_list.count()
@@ -29,7 +28,7 @@ def index(request):
             response = HttpResponse(csv_buffer.getvalue(), content_type="text/csv")
             response['Content-Disposition'] = 'attachment; filename=daftar-pengguna.csv'
             return response
-    
+
     page = request.GET.get('page', 1)
     users, page_range = pagination(user_list, page)
 
@@ -40,7 +39,7 @@ def index(request):
         'form': form,
         'user_count': user_count,
         'filter_count': user_list.count(),
-        'query_params': 'name=%s&start_date=%s&end_date=%s&status=%s&batch=%s' % (request.GET.get('name', ''), 
+        'query_params': 'name=%s&start_date=%s&end_date=%s&status=%s&batch=%s' % (request.GET.get('name', ''),
             request.GET.get('start_date', ''), request.GET.get('end_date', ''), request.GET.get('status', ''), request.GET.get('batch', '')),
         'page_range': page_range
     }
@@ -59,7 +58,10 @@ def details(request, id):
         'page_active': 'user',
         'title': 'User Detail',
         'survey': survey,
-        'student': user.get_student()
+        'student': user.get_student(),
+        'to_participant_form': ChangeToParticipantForm(initial={
+            'training': user.get_student().training
+        })
     }
     return render(request, 'backoffice/users/details.html', context)
 
@@ -67,7 +69,7 @@ def details(request, id):
 @staff_member_required
 def participants(request):
     user_ids = Student.objects.filter(status=Student.STATUS.participants) \
-        .distinct('user_id').values_list('user_id', flat=True)
+        .exclude(user__username='deleted').distinct('user_id').values_list('user_id', flat=True)
     user_list = User.objects.exclude(is_superuser=True).exclude(is_staff=True) \
         .filter(id__in=user_ids)
     user_count = user_list.count()
@@ -92,7 +94,7 @@ def participants(request):
         'form': form,
         'user_count': user_count,
         'filter_count': user_list.count(),
-        'query_params':'name=%s&start_date=%s&end_date=%s&status=%s&batch=%s' % (request.GET.get('name', ''), 
+        'query_params':'name=%s&start_date=%s&end_date=%s&status=%s&batch=%s' % (request.GET.get('name', ''),
             request.GET.get('start_date', ''), request.GET.get('end_date', ''), request.GET.get('status', 2), request.GET.get('batch', '')),
         'page_range': page_range
     }
@@ -105,12 +107,13 @@ def change_to_participant(request, id):
     student = user.get_student()
 
     if student.status == Student.STATUS.selection:
-        student.status = Student.STATUS.participants
-        student.save(update_fields=['status'])
-        student.notification_status()
+        form = ChangeToParticipantForm(request.POST or None)
 
-        messages.success(request, 'Status berhasil diubah menjadi peserta')
-        return redirect('backoffice:users:details', id=user.id)
+        if form.is_valid():
+            form.save(student)
+
+            messages.success(request, 'Status berhasil diubah menjadi peserta')
+            return redirect('backoffice:users:details', id=user.id)
 
     messages.success(request, 'Maaf, pengguna ini sudah menjadi peserta atau sudah lulus')
     return redirect('backoffice:users:index')

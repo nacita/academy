@@ -13,6 +13,8 @@ urlpatterns = [
             views.active_account, name='active_account'),
     path('profile/', views.profile, name='profile'),
     path('edit_profile/', views.edit_profile, name='edit_profile'),
+    path('edit_avatar/', views.edit_avatar, name='edit_avatar'),
+    path('change-password/', views.change_password, name='change_password'),
     path('forgot-password/', views.forgot_password, name='forgot_password'),
     re_path(r'^reset-password/(?P<uidb36>[0-9A-Za-z]+)/(?P<token>.+)/$',
             views.reset_password, name='reset_password'),
@@ -21,4 +23,6 @@ urlpatterns = [
     path('survey/edit/', views.edit_survey, name='edit_survey'),
     re_path(r'^auth-user/(?P<uidb36>[0-9A-Za-z]+)/(?P<token>.+)/$',
             views.auth_user, name='auth_user'),
+    path('inbox/', views.inbox, name='inbox'),
+    path('inbox/<int:id>', views.inbox_detail, name='inbox_detail'),
 ]
