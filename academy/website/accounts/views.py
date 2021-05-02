@@ -6,41 +6,37 @@ from django.utils.http import base36_to_int
 from django.contrib.auth.tokens import default_token_generator
 from django.http import Http404
 from django.contrib.auth.forms import SetPasswordForm, PasswordChangeForm
+from django.conf import settings
 
-from academy.apps.accounts.models import User, Inbox
-from academy.apps.students.models import Training, Student
-from .forms import CustomAuthenticationForm, SignupForm, ProfileForm, StudentForm, ForgotPasswordForm, SurveyForm, \
-    AvatarForm
+from academy.apps.accounts.models import User, Inbox, Certificate, Profile
+from academy.apps.offices.models import BannerInfo
+from academy.apps.students.models import Training
+from academy.core.utils import pagination
+from .forms import (
+    CustomAuthenticationForm, SignupForm, ProfileForm, StudentForm,
+    ForgotPasswordForm, SurveyForm, AvatarForm
+)
 
 
 @login_required
 def index(request):
-    if not hasattr(request.user, 'survey'):
-        return redirect("website:accounts:survey")
+    # if not hasattr(request.user, 'survey'):
+    #     return redirect("website:accounts:survey")
 
     user = request.user
-    training = Training.objects.filter(is_active=True) \
-        .exclude(batch__contains='NSC').order_by('batch').last()
-    if not training:
-        training = Training.objects.create(batch="0")
+    training = Training.get_or_create_initial()
 
     if hasattr(user, 'profile'):
-        student = request.user.get_student()
-        graduate = None
+        return redirect("website:accounts:profile")
 
-        if hasattr(student, 'graduate'):
-            graduate = student.graduate
-            graduate.generate_certificate_file()
-
-        context = {
-            'title': 'Dasbor',
-            'student': student,
-            'graduate': graduate,
-            'menu_active': 'dashboard'
+    form = ProfileForm(
+        data=request.POST or None, files=request.FILES or None,
+        cv_required=False,
+        initial={
+            "first_name": user.first_name,
+            "last_name": user.last_name
         }
-        return render(request, 'dashboard/index.html', context)
-
-    form = ProfileForm(data=request.POST or None, files=request.FILES or None)
+    )
     if form.is_valid():
         form.save(user)
         form_student = StudentForm(data={'user': user.id, 'training': training.id})
@@ -56,36 +52,12 @@ def index(request):
     return render(request, 'accounts/index.html', context)
 
 
-def login_view(request):
+def sign_up(request):
     if request.user.is_authenticated:
         return redirect('website:accounts:index')
 
-    form = CustomAuthenticationForm(request, data=request.POST or None)
-    if form.is_valid():
-        user = form.get_user()
-        login(request, user)
-
-        next = request.GET.get('next') or None
-        if next:
-            return redirect(next)
-        else:
-            return redirect("website:accounts:index")
-
-    context = {
-        'form': form,
-        'title': 'Masuk',
-        'page': 'login'
-    }
-    return render(request, 'accounts/form.html', context)
-
-
-def logout_view(request):
-    logout(request)
-    return redirect("website:index")
-
-
-def sign_up(request):
-    if request.user.is_authenticated:
+    if settings.DISABLE_REGISTER:
+        messages.warning(request, 'Mohon maaf, pendaftaran sedang ditutup')
         return redirect('website:accounts:index')
 
     form = SignupForm(request.POST or None)
@@ -145,7 +117,8 @@ def profile(request):
         'user': user,
         'student': student,
         'graduate': graduate,
-        'survey': survey
+        'survey': survey,
+        'banner_info': BannerInfo.objects.filter(is_active=True).last()
     }
     return render(request, 'dashboard/profile.html', context)
 
@@ -156,13 +129,16 @@ def edit_avatar(request):
 
     if form.is_valid():
         form.save()
-        
+
     return redirect("website:accounts:profile")
 
 
 @login_required
 def edit_profile(request):
     user = request.user
+    if not hasattr(user, 'profile'):
+        Profile.objects.create(user=user, address="")
+        user.refresh_from_db()
 
     initial = {
         'first_name': user.first_name,
@@ -181,8 +157,10 @@ def edit_profile(request):
         'instagram': user.profile.instagram
     }
 
-    form = ProfileForm(data=request.POST or None, files=request.FILES or None,
-                       initial=initial, instance=user.profile)
+    form = ProfileForm(
+        data=request.POST or None, files=request.FILES or None,
+        initial=initial, instance=user.profile, cv_required=False
+    )
     if form.is_valid():
         form.save(user)
         messages.success(request, 'Profil berhasil diubah')
@@ -224,7 +202,8 @@ def forgot_password(request):
     context = {
         'title': 'Lupa kata sandi',
         'form': form,
-        'navbar': navbar
+        'navbar': navbar,
+        'mobile_layout': navbar
     }
     return render(request, 'accounts/form.html', context)
 
@@ -313,24 +292,52 @@ def auth_user(request, uidb36, token):
 
 @login_required
 def inbox(request):
-    if request.POST :
+    if request.POST:
         data = request.POST
-        for id in data.getlist('checkMark'):
-            inbox = Inbox.objects.get(id=id)
-            if inbox:
-                if data['action'] == "unread" :
-                    inbox.is_read = False
-                if data['action'] == "read" :
-                    inbox.is_read = True
+        page = data['page']
+        if data['action'] == "unread":
+            for id in data.getlist('checkMark'):
+                inbox = Inbox.objects.get(id=id)
+                inbox.is_read = False
                 inbox.save()
+        elif data['action'] == "read":
+            for id in data.getlist('checkMark'):
+                inbox = Inbox.objects.get(id=id)
+                inbox.is_read = True
+                inbox.save()
+        elif data['action'] == "delete":
+            for id in data.getlist('checkMark'):
+                inbox = Inbox.objects.get(id=id)
+                inbox.delete()
+            messages.success(request, 'Pesan berhasil dihapus')
+        return redirect(f'/accounts/inbox/?page={ page }')
 
     user = request.user
-    inboxs = Inbox.objects.filter(user=user).order_by('-sent_date')
+    inbox_list = Inbox.objects.filter(user=user).order_by('-sent_date')
+
+    # pagination
+    length = 50
+    try:
+        page = int(request.GET.get('page', 1))
+    except ValueError:
+        page = 1
+
+    inboxs, page_range = pagination(inbox_list, page, length)
+    detail_page = {
+        'page': page,
+        'next': page + 1,
+        'prev': page - 1,
+        'start': length * page - length+1,
+        'end': length * page,
+        'total': inbox_list.count()
+    }
 
     context = {
         'title': 'Inbox',
         'menu_active': 'inbox',
-        'inboxs': inboxs
+        'inboxs': inboxs,
+        'page_range': page_range,
+        'detail_page': detail_page
     }
     return render(request, 'dashboard/inbox.html', context)
 
@@ -348,3 +355,30 @@ def inbox_detail(request, id):
         'inbox': inbox
     }
     return render(request, 'dashboard/inbox_detail.html', context)
+
+
+@login_required
+def certificates(request):
+    certificates = []
+    for cert in Certificate.objects.filter(user=request.user):
+        if cert.certificate_file:
+            certificates.append({
+                "title": cert.title,
+                "number": cert.number,
+                "url": cert.certificate_file.url
+            })
+
+    for cert in request.user.graduates.all():
+        if cert.certificate_file:
+            certificates.append({
+                "title": "DevOps",
+                "number": cert.certificate_number,
+                "url": cert.certificate_file.url
+            })
+
+    context = {
+        'title': 'Sertifikat',
+        'menu_active': 'certificate',
+        'certificates': certificates
+    }
+    return render(request, 'dashboard/certificates.html', context)

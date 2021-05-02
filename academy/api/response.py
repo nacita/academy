@@ -9,17 +9,25 @@ class ErrorResponse(Response):
     API subclass from rest_framework response to easy extact error message Form
     """
 
-    def __init__(self, form=None, error_message=None, **kwargs):
+    def __init__(self, form=None, serializer=None, error_message=None, **kwargs):
         super().__init__(status=status.HTTP_400_BAD_REQUEST)
 
         data = kwargs
         if not data.get('detail'):
             data['detail'] = "Your request cannot be completed"
             data["error_message"] = data['detail']
+            data["message"] = data['detail']
             data["error_code"] = "invalid_request"
 
         if error_message:
             data["error_message"] = error_message
+            data["message"] = error_message
+
+        # only returns the first error
+        if serializer is not None:
+            data['errors'] = {}
+            for k, v in serializer.errors.items():
+                data['errors'][k] = v[0]
 
         # only returns the first error
         if form and form.errors.items():

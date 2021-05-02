@@ -2,13 +2,19 @@ from django.conf import settings
 from academy.apps.accounts.models import User
 from academy.apps.students.templatetags.tags_students import get_status, status_to_display
 
+
 def user_profile(user: User) -> dict:
     user_data = {
+        'id': user.id,
         'name': user.name,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "is_superuser": user.is_superuser,
+        "is_active": user.is_active,
+        "is_staff": user.is_staff,
         'username': user.username,
         'email': user.email,
         'phone': user.phone,
-        'is_active': user.is_active,
         'status': 1,
         'avatar': "",
         'linkedin': "",
@@ -25,13 +31,11 @@ def user_profile(user: User) -> dict:
 
     if hasattr(user, 'profile'):
         profile = user.profile
-        avatar = settings.MEDIA_HOST + profile.avatar.url \
-            if profile.avatar else None
         cv = settings.MEDIA_HOST + profile.curriculum_vitae.url \
             if user.profile.curriculum_vitae else None
 
         user_data['has_profile'] = True
-        user_data['avatar'] = avatar
+        user_data['avatar'] = profile.get_avatar(with_host=True)
         user_data['linkedin'] = profile.linkedin
         user_data['git_repo'] = profile.git_repo
         user_data['blog'] = profile.blog
@@ -45,9 +49,8 @@ def user_profile(user: User) -> dict:
         user_data['telegram_id'] = profile.telegram_id
         user_data['curriculum_vitae'] = cv
 
-    if hasattr(user, 'students'):
-        student = user.get_student()
-        user_data['status'] = student.status
+    student = user.get_student()
+    user_data['status'] = student.status if student else 1
 
     return user_data
 

@@ -39,6 +39,7 @@ ALLOWED_HOSTS = ['*']
 # do not mark / at the end of the host
 HOST = 'http://academy.btech.id'
 MEDIA_HOST = HOST
+NOLSATU_COURSE_HOST = 'https://course.nolsatu.id'
 
 # Application definition
 
@@ -49,6 +50,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.humanize',
     'django.forms',
 
     'academy.core',
@@ -59,12 +61,23 @@ INSTALLED_APPS = [
     'academy.apps.surveys',
     'academy.apps.offices',
     'academy.apps.campuses',
+    'academy.apps.broadcasts',
 
     'post_office',
     'django_extensions',
     'qr_code',
     'rest_framework',
-
+    'compressor',
+    'ckeditor',
+    'ckeditor_uploader',
+    'multiselectfield',
+    'django_rq',
+    'fcm_django',
+    'taggit',
+    "meta",
+    "django_keycloak.apps.KeycloakAppConfig",
+    'django_social_share',
+    'sorl.thumbnail'
 ]
 
 MIDDLEWARE = [
@@ -73,9 +86,13 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'academy.core.middleware.MobileCheckMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django_keycloak.middleware.BaseKeycloakMiddleware',
 ]
+
+SESSION_ENGINE = 'redis_sessions.session'
 
 ROOT_URLCONF = 'academy.urls'
 
@@ -90,6 +107,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'academy.core.context_processors.nolsatu_context',
             ],
         },
     },
@@ -98,7 +116,6 @@ TEMPLATES = [
 FORM_RENDERER = 'django.forms.renderers.TemplatesSetting'
 
 WSGI_APPLICATION = 'academy.wsgi.application'
-
 
 # Database
 # https://docs.djangoproject.com/en/1.11/ref/settings/#databases
@@ -109,7 +126,6 @@ DATABASES = {
         'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/1.11/ref/settings/#auth-password-validators
@@ -133,20 +149,18 @@ AUTH_USER_MODEL = 'accounts.User'
 AUTHENTICATION_BACKENDS = (
     'academy.core.custom_auth.EmailBackend',
     'django.contrib.auth.backends.ModelBackend',
+    'django_keycloak.auth.backends.KeycloakAuthorizationCodeBackend',
 )
 
 # other app
 EMAIL_BACKEND = 'post_office.EmailBackend'
-DEFAULT_FROM_EMAIL = 'notification@btech.co.id'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_HOST_USER = 'notification@btech.co.id'
-EMAIL_HOST_PASSWORD = '!N0t1f1c4t10n@w388t3ch!'
-EMAIL_USE_TLS = True
-EMAIL_PORT = 587
-DEFAULT_RECIPIANT_EMAIL = 'contact@btech.id'
 
 POST_OFFICE = {
-    'BATCH_SIZE': 100
+    'BATCH_SIZE': 50,
+    'THREADS_PER_PROCESS': 10,
+    'BACKENDS': {
+        'default': 'academy.core.email.backends.AcademySMTPEmailBackend'
+    }
 }
 
 # Internationalization
@@ -155,7 +169,7 @@ POST_OFFICE = {
 LANGUAGE_CODE = 'id'
 # LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Jakarta'
 
 USE_I18N = True
 
@@ -177,16 +191,97 @@ STATIC_ROOT = os.path.join(SETTINGS_DIR, 'static')
 INDICATOR_GRADUATED = 6
 INDICATOR_REPEATED = 3
 
-sentry_sdk.init(
-    dsn="https://c9a271a3699648e18769f6370f4d7488@sentry.io/1339389",
-    integrations=[DjangoIntegration()]
-)
-
 # JWT Config
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=3),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
 }
+
+# django redis coockies
+SESSION_COOKIE_DOMAIN = '.nolsatu.id'
+
+# django cache using redis
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': 'redis://127.0.0.1:6379/1',
+        'TIMEOUT': 3699 * 24 * 3,  # 3 day
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient'
+        }
+    }
+}
+
+# django compressor
+COMPRESS_ENABLED = True
+STATICFILES_FINDERS = (
+    'django.contrib.staticfiles.finders.FileSystemFinder',
+    'django.contrib.staticfiles.finders.AppDirectoriesFinder',
+    # other finders..
+    'compressor.finders.CompressorFinder',
+)
+
+# ckeditor
+CKEDITOR_UPLOAD_PATH = "uploads/"
+CKEDITOR_CONFIGS = {
+    'default': {
+        'toolbar': 'full',
+        'width': '100%',
+    },
+    'basic_ckeditor': {
+        'toolbar': 'Basic',
+        'width': '100%',
+    },
+}
+
+# django_rq
+RQ_QUEUES = {
+    'default': {
+        'HOST': 'localhost',
+        'PORT': 6379,
+        'DB': 0,
+        'DEFAULT_TIMEOUT': 360,
+    },
+    'high': {
+        'HOST': 'localhost',
+        'PORT': 6379,
+        'DB': 0,
+        'DEFAULT_TIMEOUT': 500,
+    },
+    'low': {
+        'HOST': 'localhost',
+        'PORT': 6379,
+        'DB': 0,
+        'DEFAULT_TIMEOUT': 360,
+    }
+}
+
+FCM_DJANGO_SETTINGS = {
+    "APP_VERBOSE_NAME": "NolSatu",
+    "FCM_SERVER_KEY": "--ENTER_YOUR_SERVER_KEY",
+    "ONE_DEVICE_PER_USER": False,
+    "DELETE_INACTIVE_DEVICES": True,
+}
+
+
+API_GATEWAY = [
+    ('course', 'https://course.nolsatu.id/api/')
+]
+
+SERVER_KEY = "serverToServerAuthKeyKeepItVerySecret"
+
+# Keycloack
+KEYCLOAK_OIDC_PROFILE_MODEL = 'django_keycloak.OpenIdConnectProfile'
+KEYCLOAK_USE_PREFERRED_USERNAME = True
+KEYCLOAK_USE_EMAIL_AS_USER_KEY = True
+KEYCLOAK_SYNC_USER_MODEL_HANDLER = 'academy.core.utils.sync_keycloak_user'
+
+# toggle to enable disable create account
+DISABLE_REGISTER = False
+
+# django-meta setting
+META_SITE_PROTOCOL = 'http'
+META_SITE_DOMAIN = 'localhost:8000'
 
 try:
     from .local_settings import *

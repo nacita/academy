@@ -1,13 +1,14 @@
 from django.urls import path, include, re_path
 from . import views
+from . import auth_views
 
 
 app_name = 'accounts'
 
 urlpatterns = [
     path('', views.index, name='index'),
-    path('login/', views.login_view, name='login'),
-    path('logout/', views.logout_view, name='logout'),
+    path('login/', auth_views.login_view, name='login'),
+    path('logout/', auth_views.logout_view, name='logout'),
     path('sign-up/', views.sign_up, name='sign_up'),
     re_path(r'^activate/(?P<uidb36>[0-9A-Za-z]+)/(?P<token>.+)/$',
             views.active_account, name='active_account'),
@@ -25,4 +26,5 @@ urlpatterns = [
             views.auth_user, name='auth_user'),
     path('inbox/', views.inbox, name='inbox'),
     path('inbox/<int:id>', views.inbox_detail, name='inbox_detail'),
+    path('certificates/', views.certificates, name='certificates'),
 ]

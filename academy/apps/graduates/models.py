@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 import pdfkit
+from django.db.models import Avg
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -11,6 +12,8 @@ from django.template.loader import get_template
 from model_utils.fields import AutoCreatedField
 
 from academy.core.utils import image_upload_path
+
+from model_utils import Choices
 
 
 def get_sentinel_user():
@@ -94,3 +97,48 @@ class Graduate(models.Model):
     @property
     def valid_until(self):
         return self.created + timedelta(days=1095)
+
+    def rating_accumulation(self):
+        return self.ratings.aggregate(avg=Avg('rating'))['avg']
+
+    def get_rating_stars(self, rating_accumulation=None):
+        html_stars = []
+
+        if rating_accumulation:
+            count = rating_accumulation
+        else:
+            count = self.rating_accumulation()
+
+        if not count:
+            return "-"
+
+        for i in range(0, 5):
+            i += 1
+            if i <= int(count):
+                html_stars.append('<i class="fa fa-star"></i>')
+            else:
+                html_stars.append('<i class="far fa-star"></i>') 
+
+        return "".join(html_stars)
+
+    def is_name_valid(self, last_name):
+        cond1 = (self.user.last_name and self.user.last_name.lower() == last_name.lower())
+        cond2 = (not self.user.last_name and self.user.first_name and self.user.first_name.lower() == last_name.lower())
+        return cond1 or cond2
+
+
+class Rating(models.Model):
+    respondent_name = models.CharField(max_length=150, blank=True, null=True)
+    RATING = Choices(
+        (1, 'one', 'One'),
+        (2, 'two', 'Two'),
+        (3, 'three', 'Three'),
+        (4, 'four', 'Four'),
+        (5, 'five', 'Five'),
+    )
+    rating = models.PositiveIntegerField(choices=RATING, default=RATING.one)
+    graduate = models.ForeignKey('graduates.Graduate', on_delete=models.CASCADE, 
+                                 related_name='ratings')
+
+    def __str__(self):
+        return f"{self.respondent_name} - {self.rating}"

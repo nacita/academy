@@ -13,6 +13,14 @@
 
 {% block content %}
 <div class="col-md-12 card">
+        {% if banner_info.is_show %}
+            <div class="alert alert-{{ banner_info.color_style }} alert-dismissible">
+                <button type="button" class="close" data-dismiss="alert" aria-hidden="true">×</button>
+                <h5><i class="icon fas fa-info"></i> {{ banner_info.title }}</h5>
+                {{ banner_info.content|safe }}
+            </div>
+        {% endif %}
+
         <div class="card-header">
             <div class="fa-pull-right">
                 <a class="btn btn-primary text-white" href="{% url 'website:accounts:edit_profile' %}">Ubah</a>
@@ -63,12 +71,12 @@
                                                         {{ user.phone }}
                                                     </td>
                                                 </tr>
-                                                <tr>
+                                                {% comment %} <tr>
                                                     <td class="font-weight-bold">Status</td>
                                                     <td>
                                                         {{ student.status|status_display:"True" }}
                                                     </td>
-                                                </tr>
+                                                </tr> {% endcomment %}
                                                 {% if student.campus %}
                                                 <tr>
                                                     <td class="font-weight-bold">Kampus</td>
@@ -79,7 +87,8 @@
                                                 {% endif %}
                                                 <tr>
                                                     {% if graduate %}
-                                                        <td colspan="2" class="font-weight-bold">Sertifikat<embed class="pb-5" src="{{ graduate.certificate_file.url }}" type="application/pdf" width="100%" height="600px" /></td>
+                                                        <td class="font-weight-bold">Sertifikat</td>
+                                                        <td><a href="{% url 'website:accounts:certificates' %}">lihat disini</a></td>
                                                     {% endif %}
                                                 </tr>
                                             </tbody>
@@ -138,7 +147,7 @@
                                     </tbody></table>
                                 </div>
 
-                                {% if survey %}
+                                {% comment %} {% if survey %}
                                 <div class="table-responsive box box-info">
                                     <table class="table table-bordered">
 
@@ -188,7 +197,7 @@
                                         </tr>
                                     </table>
                                 </div>
-                                {% endif %}
+                                {% endif %} {% endcomment %}
                             </div>
                         </div>
                     </div>

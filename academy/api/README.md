@@ -606,7 +606,216 @@ method: `GET`
             "source_identifier": "linux_today",
             "post_title": "Manjaro 18.1: Goes Arch One Better",
             "post_link": "http://feedproxy.google.com/~r/LinuxToday/~3/pTuZ32M08zs/manjaro-18.1-goes-arch-one-better.html"
-        },
+        }
     ]
+}
+```
+## Inbox
+
+### All Inbox
+url: `/api/inbox`
+
+header:
+```
+Conten-Type application/json
+```
+
+method: `GET`
+
+```json
+[
+    {
+        "id": 12,
+        "subject": "Tes",
+        "sent_date": "2019-12-03T05:04:57.858493Z",
+        "is_read": false,
+    }
+]
+```
+
+### Detail Inbox
+url: `/api/inbox/<int:id>`
+
+header:
+```
+Conten-Type application/json
+```
+
+method: `GET`
+
+```json
+{
+    "id": 12,
+    "subject": "Tes",
+    "content": "<p>tesssss</p>",
+    "raw_content": "tesssss",
+    "sent_date": "2019-12-03T05:04:57.858493Z",
+    "is_read": true,
+}
+```
+
+### Delete Inbox
+url: `/api/inbox/<int:id>`
+
+header:
+```
+Conten-Type application/json
+```
+
+method: `DELETE`
+
+response:
+```json
+{
+    "message": "Pesan berhasil dihapus"
+}
+```
+
+
+### Bulk Read Unread
+url: `/api/inbox/read`
+
+header:
+```
+Conten-Type application/json
+```
+
+method: `GET`
+
+request: 
+
+```json
+{
+	"filter": [10, 12],
+	"read_state": false
+}
+```
+
+```json
+{
+	"filter": [-1],
+	"read_state": true
+}
+```
+
+param:
+- filter = list of inbox id or `[-1]` for all inbox for authenticated user
+- read_state = inbox `is_read` state
+
+response:
+```json
+[
+    {
+        "id": 12,
+        "subject": "Tes",
+        "content": "tesssss",
+        "sent_date": "2019-12-03T05:04:57.858493Z",
+        "is_read": false
+    }
+]
+```
+
+### Bulk Delete
+url: `/api/inbox/delete`
+
+header:
+```
+Conten-Type application/json
+```
+
+method: `POST`
+
+request: 
+
+```json
+{
+	"inbox_ids": [10, 12]
+}
+```
+
+```json
+{
+	"inbox_ids": [-1]
+}
+```
+
+param:
+- inbox_ids = list of inbox id or `[-1]` for all inbox for authenticated user
+
+response:
+```json
+[
+    {
+        "message": "Berhasil hapus pesan yang dipilih"
+    }
+]
+```
+
+## FCM Devices
+
+
+### Register Token
+url: `/api/devices/`
+
+
+method: `POST`
+
+request: 
+
+```json
+{
+    "registration_id": "FCM_TOKEN",
+    "type": "android/ios/web"
+}
+```
+
+`registration_id` is unique.
+
+## Certificates
+
+
+### List All Certificates
+url: `/api/certificates/`
+
+
+method: `GET`
+
+response:
+```json
+[
+    {
+        "id": 52,
+        "title": "123",
+        "number": "123",
+        "created": "2020-08-17T23:54:44.317268+07:00",
+        "valid_until": "2023-08-17T16:54:44.317268Z",
+        "certificate_file": "http://localhost:8000/media/images/certificates/2020/08/17/setyongr_exported_17082020-235141779941.pdf"
+    },
+    {
+        "id": 51,
+        "title": "Tess",
+        "number": "asdasdasd",
+        "created": "2020-08-17T23:54:44.315673+07:00",
+        "valid_until": "2023-08-17T16:54:44.315673Z",
+        "certificate_file": "http://localhost:8000/media/images/certificates/2020/08/17/setyongr_exported_17082020-235141778503.pdf"
+    }
+]
+```
+
+### Get Single Certificate
+url: `/api/certificates/<int:id>`
+
+
+method: `GET`
+
+response:
+```json
+{
+    "id": 52,
+    "title": "123",
+    "number": "123",
+    "created": "2020-08-17T23:54:44.317268+07:00",
+    "valid_until": "2023-08-17T16:54:44.317268Z",
+    "certificate_file": "http://localhost:8000/media/images/certificates/2020/08/17/setyongr_exported_17082020-235141779941.pdf"
 }
 ```

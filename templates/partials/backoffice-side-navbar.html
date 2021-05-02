@@ -1,13 +1,22 @@
 {% load static %}
 
 <!-- Main Sidebar Container -->
-<aside class="main-sidebar elevation-4 sidebar-light-danger">
+<aside class="main-sidebar elevation-4 sidebar-{{ sidebar_color }}-{{ color_theme }}">
     <!-- Brand Logo -->
     <!-- Brand Logo -->
     <a href="{% url 'website:index' %}" class="brand-link">
-      <img src="{% static 'website/images/logo/logo-polos-warna-30.png' %}" alt="NOLSATU Logo" class="brand-image"
-           style="opacity: .8">
-      <span class="brand-text font-weight-bold color-white">NOLSATU</span>
+        {% if not hide_logo %}
+            <img src="{{ brand_logo }}" alt="{{ site_name }} Logo" class="brand-image"
+                style="opacity: .8">
+        {% endif %}
+
+        <span class="brand-text font-weight-bold color-white" style="font-size:88%;">
+            {% if not hide_site_name %}
+                {{ site_name }}
+            {% else %}
+                &nbsp;
+            {% endif %}
+        </span>
     </a>
 
     <!-- Sidebar -->
@@ -34,19 +43,18 @@
                 </a>
             </li>
 
-            <li class="nav-item">
-                <a href="{% url 'backoffice:users:index' %}" class="nav-link {% if menu_active == '' %}active{% endif %}">
+            <li class="nav-item {% if menu_active == 'user' %}has-treeview menu-open{% endif %}">
+                <a href="#" class="nav-link {% if menu_active == 'user' %}active{% endif %}">
                     <i class="nav-icon fas fa-users"></i>
-                    <p>Data Pengguna</p>
-                </a>
-            </li>
-
-            <li class="nav-item {% if menu_active == '' %}has-treeview menu-open{% endif %}">
-                <a href="#" class="nav-link {% if menu_active == '' %}active{% endif %}">
-                    <i class="nav-icon fas fa-id-card"></i>
-                    <p>Peserta<i class="right fas fa-angle-left"></i></p>
+                    <p>Pengguna<i class="right fas fa-angle-left"></i></p>
                 </a>
                 <ul class="nav nav-treeview">
+                    <li class="nav-item">
+                        <a href="{% url 'backoffice:users:index' %}" class="nav-link">
+                            <i class="far fa-circle nav-icon"></i>
+                            <p>Data Pengguna</p>
+                        </a>
+                    </li>
                     <li class="nav-item">
                         <a href="{% url 'backoffice:users:participants' %}" class="nav-link">
                             <i class="far fa-circle nav-icon"></i>
@@ -56,28 +64,48 @@
                     <li class="nav-item">
                         <a href="{% url 'backoffice:training_materials:bulk_material_status' %}" class="nav-link">
                             <i class="far fa-circle nav-icon"></i>
-                            <p>Status Pelatihan</p>
+                            <p>Status Pelatihan Peserta</p>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{% url 'backoffice:users:last_login' %}" class="nav-link">
+                            <i class="far fa-circle nav-icon"></i>
+                            <p>Masuk Terakhir</p>
                         </a>
                     </li>
                 </ul>
             </li>
 
             <li class="nav-item">
-                <a href="{% url 'backoffice:users:batch_training' %}" class="nav-link {% if menu_active == '' %}active{% endif %}">
-                    <i class="nav-icon fas fa-certificate"></i>
-                    <p>Angkatan</p>
-                </a>
-            </li>
-
-            <li class="nav-item">
-                <a href="{% url 'backoffice:training_materials:index' %}" class="nav-link {% if menu_active == 'change_password' %}active{% endif %}">
+                <a href="{{ nolsatu_course_home_page }}" class="nav-link {% if menu_active == 'materi' %}active{% endif %}">
                     <i class="nav-icon fas fa-th-list"></i>
-                    <p>Materi Pelatihan</p>
+                    <p>Daftar Materi</p>
                 </a>
             </li>
 
-            <li class="nav-item {% if menu_active == '' %}has-treeview menu-open{% endif %}">
-                <a href="#" class="nav-link {% if menu_active == '' %}active{% endif %}">
+            {% comment %} <li class="nav-item {% if menu_active == 'materials' %}has-treeview menu-open{% endif %}">
+                <a href="#" class="nav-link {% if menu_active == 'materials' %}active{% endif %}">
+                    <i class="nav-icon fas fa-th-list"></i>
+                    <p>Materi Pelatihan<i class="right fas fa-angle-left"></i></p>
+                </a>
+                <ul class="nav nav-treeview">
+                    <li class="nav-item">
+                        <a href="{% url 'backoffice:training_materials:index' %}" class="nav-link">
+                            <i class="far fa-circle nav-icon"></i>
+                            <p>Ops</p>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ nolsatu_course_home_page }}/backoffice/courses/" class="nav-link">
+                            <i class="far fa-circle nav-icon"></i>
+                            <p>Dev</p>
+                        </a>
+                    </li>
+                </ul>
+            </li> {% endcomment %}
+
+            {% comment %} <li class="nav-item {% if menu_active == 'graduates' %}has-treeview menu-open{% endif %}">
+                <a href="#" class="nav-link {% if menu_active == 'graduates' %}active{% endif %}">
                     <i class="nav-icon fas fa-user-graduate"></i>
                     <p>Lulusan<i class="right fas fa-angle-left"></i></p>
                 </a>
@@ -101,24 +129,10 @@
                         </a>
                     </li>
                 </ul>
-            </li>
+            </li> {% endcomment %}
 
-            <li class="nav-item">
-                <a href="{% url 'backoffice:instructors:index' %}" class="nav-link {% if menu_active == '' %}active{% endif %}">
-                    <i class="nav-icon fas fa-chalkboard-teacher"></i>
-                    <p>Instruktur</p>
-                </a>
-            </li>
-
-            <li class="nav-item">
-                <a href="{% url 'backoffice:surveys:index' %}" class="nav-link {% if menu_active == '' %}active{% endif %}">
-                    <i class="nav-icon fas fa-poll-h"></i>
-                    <p>Survey</p>
-                </a>
-            </li>
-
-            <li class="nav-item {% if menu_active == '' %}has-treeview menu-open{% endif %}">
-                <a href="#" class="nav-link {% if menu_active == '' %}active{% endif %}">
+            {% comment %} <li class="nav-item {% if menu_active == 'campus' %}has-treeview menu-open{% endif %}">
+                <a href="#" class="nav-link {% if menu_active == 'campus' %}active{% endif %}">
                     <i class="nav-icon fas fa-university"></i>
                     <p>Kampus<i class="right fas fa-angle-left"></i></p>
                 </a>
@@ -142,19 +156,96 @@
                         </a>
                     </li>
                 </ul>
-            </li>
+            </li> {% endcomment %}
+
+            {% comment %} <li class="nav-item">
+                <a href="{% url 'backoffice:surveys:index' %}" class="nav-link {% if menu_active == 'surveys' %}active{% endif %}">
+                    <i class="nav-icon fas fa-poll-h"></i>
+                    <p>Survey</p>
+                </a>
+            </li> {% endcomment %}
 
             <li class="nav-item">
-                <a href="{% url 'backoffice:partners:index' %}" class="nav-link {% if menu_active == '' %}active{% endif %}">
-                    <i class="nav-icon fas fa-handshake"></i>
-                    <p>Mitra</p>
+                <a href="{% url 'backoffice:broadcasts:index' %}" class="nav-link {% if menu_active == 'broadcast' %}active{% endif %}">
+                    <i class="nav-icon fas fa-bullhorn"></i>
+                    <p>Pesan Siaran</p>
                 </a>
             </li>
 
+            <li class="nav-item {% if menu_active == 'setting' %}has-treeview menu-open{% endif %}">
+                <a href="#" class="nav-link {% if menu_active == 'setting' %}active{% endif %}">
+                    <i class="nav-icon fas fas fa-cog"></i>
+                    <p>Pengaturan<i class="right fas fa-angle-left"></i></p>
+                </a>
+                <ul class="nav nav-treeview">
+                    <li class="nav-item">
+                        <a href="{% url 'backoffice:setting_appearance' %}" class="nav-link">
+                            <i class="far fa-circle nav-icon"></i>
+                            <p>Tampilan</p>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{% url 'backoffice:setting_authorization' %}" class="nav-link">
+                            <i class="far fa-circle nav-icon"></i>
+                            <p>Otorisasi</p>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{% url 'backoffice:settings:email_index' %}" class="nav-link">
+                            <i class="far fa-circle nav-icon"></i>
+                            <p>Email</p>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{% url 'backoffice:import_users' %}" class="nav-link">
+                            <i class="far fa-circle nav-icon"></i>
+                            <p>Impor Pengguna</p>
+                        </a>
+                    </li>
+                </ul>
+            </li>
+
+            <li class="nav-header">Data Master</li>
+            <li class="nav-item {% if menu_active == 'campus' %}has-treeview menu-open{% endif %}">
+                <a href="#" class="nav-link {% if menu_active == 'campus' %}active{% endif %}">
+                    <i class="nav-icon fas fa-list"></i>
+                    <p>Data<i class="right fas fa-angle-left"></i></p>
+                </a>
+                <ul class="nav nav-treeview">
+                    <li class="nav-item">
+                        <a href="{% url 'backoffice:users:batch_training' %}" class="nav-link {% if menu_active == 'batch' %}active{% endif %}">
+                            <i class="nav-icon fas fa-certificate"></i>
+                            <p>Angkatan</p>
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a href="{% url 'backoffice:partners:index' %}" class="nav-link {% if menu_active == 'partner' %}active{% endif %}">
+                            <i class="nav-icon fas fa-handshake"></i>
+                            <p>Mitra</p>
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a href="{% url 'backoffice:sponsors:index' %}" class="nav-link {% if menu_active == 'sponsors' %}active{% endif %}">
+                            <i class="nav-icon fas fa-user-friends"></i>
+                            <p>Sponsor</p>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{% url 'backoffice:instructors:index' %}" class="nav-link {% if menu_active == 'instrukturs' %}active{% endif %}">
+                            <i class="nav-icon fas fa-chalkboard-teacher"></i>
+                            <p>Instruktur</p>
+                        </a>
+                    </li>
+                </ul>
+            </li>
+
+            <li class="nav-header">Admin Panel</li>
             <li class="nav-item">
-                <a href="{% url 'backoffice:sponsors:index' %}" class="nav-link {% if menu_active == '' %}active{% endif %}">
-                    <i class="nav-icon fas fa-user-friends"></i>
-                    <p>Sponsor</p>
+                <a href="{{ nolsatu_course_home_page }}/backoffice" class="nav-link {% if menu_active == '' %}active{% endif %}">
+                    <i class="nav-icon fas fa-user-cog"></i>
+                    <p>Backoffice Course</p>
                 </a>
             </li>
 
@@ -164,7 +255,6 @@
                     <p>Keluar</p>
                 </a>
             </li>
-
         </ul>
         </nav>
         <!-- /.sidebar-menu -->

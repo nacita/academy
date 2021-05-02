@@ -1,6 +1,9 @@
+import django_rq
+
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.contrib.auth.tokens import default_token_generator
+from django.forms import ClearableFileInput
 from django.utils.http import int_to_base36
 from django.conf import settings
 from django.template.loader import render_to_string
@@ -11,6 +14,7 @@ from academy.apps.accounts.models import User, Profile
 from academy.apps.students.models import Student
 from academy.apps.surveys.model import Survey
 from academy.core import fields
+from academy.core.email_utils import construct_email_args
 from academy.core.validators import validate_email, validate_mobile_phone, validate_username
 
 from post_office import mail
@@ -53,15 +57,18 @@ class ProfileForm(forms.ModelForm):
     phone_number = forms.CharField(max_length=16, validators=[validate_mobile_phone],
                                    label='Nomor Ponsel')
     curriculum_vitae = fields.FileFieldExtended(
-        label=mark_safe('Curriculum Vitae<br/>'
-                        '<a href="https://www.dropbox.com/s/nqjoadgifz7zpb0/template_cv_nolsatu.docx?dl=0" target="_blank">'
-                        'Download Template CV</a>'),
-        help_text="File Type: .doc, .docx. Max 2 MB. Mohon gunakan template yang disediakan",
+        label='Curriculum Vitae',
+        help_text="File Type: .doc, .docx, .pdf. Max 2 MB.",
         max_mb_file_size=2,
-        allowed_content_type=[
+        allowed_extension=('.doc', '.docx', '.pdf'),
+        allowed_content_type=(
             'application/msword',
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        ]
+            'application/pdf'
+        ),
+        widget=ClearableFileInput(attrs={
+            'accept': '.doc,.docx,.pdf'
+        })
     )
 
     class Meta:
@@ -129,6 +136,10 @@ class ForgotPasswordForm(forms.Form):
         return user
 
     def send_email(self, user):
+        # get setting appearance
+        from academy.apps.offices import utils
+        sett = utils.get_settings(serializer=True)
+
         data = {
             'token': default_token_generator.make_token(user),
             'uid': int_to_base36(user.id),
@@ -136,14 +147,15 @@ class ForgotPasswordForm(forms.Form):
             'user': user,
             'email_title': 'Lupa kata sandi'
         }
+        data.update(sett)
 
-        mail.send(
-            [user.email],
-            settings.DEFAULT_FROM_EMAIL,
+        kwargs = construct_email_args(
+            recipients=[user.email],
             subject='Lupa Kata Sandi',
-            context=data,
-            html_message=render_to_string('emails/forgot_password.html', context=data)
+            content=render_to_string('emails/forgot_password.html', context=data)
         )
+        kwargs['context'] = data
+        django_rq.enqueue(mail.send, **kwargs)
 
 
 class SurveyForm(forms.ModelForm):

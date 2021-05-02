@@ -16,11 +16,11 @@ from django.views import View
 from academy.core.utils import pagination
 from academy.apps.graduates.models import Graduate
 from academy.apps.students.models import Student, TrainingMaterial, TrainingStatus
-from academy.apps.accounts.models import User
+from academy.apps.accounts.models import User, Certificate
 from academy.backoffice.users.forms import ChangeStatusTraining
 from .forms import (
     ParticipantsRepeatForm, AddTrainingStatus, GraduateTrainingStatusFormSet, BaseFilterForm,
-    GraduateHasChanneledForm
+    GraduateHasChanneledForm, RatingForm
 )
 
 
@@ -52,7 +52,7 @@ class IndexView(View):
         context = {
             'graduates': graduates,
             'title': self.title,
-            'page_active': self.page_active,
+            'menu_active': 'graduates',
             'data_graduates': data_graduates,
             'page_range': page_range,
             'form': form,
@@ -126,6 +126,7 @@ def candidates(request):
 
     context = {
         'title': 'Kandidat',
+        'menu_active': 'graduates',
         'cantidate_graduates': cantidate_graduates,
         'cantidate_repeats': cantidate_repeats,
         'indicator': settings.INDICATOR_GRADUATED,
@@ -172,6 +173,7 @@ def details(request, id):
         'graduate': graduate,
         'user': graduate.user,
         'title': 'Profil Lulusan',
+        'menu_active': 'graduates',
         'student': graduate.student,
         'survey': survey
     }
@@ -188,6 +190,7 @@ def participants_repeat(request):
 
     context = {
         'title': 'Peserta mengulang',
+        'menu_active': 'graduates',
         'form': form
     }
     return render(request, 'backoffice/graduates/participants_repeat.html', context)
@@ -223,6 +226,7 @@ def status_training(request, id):
     context = {
         'formset': formset,
         'title': 'Daftar Pelatihan',
+        'menu_active': 'graduates',
         'training_materials': training_materials,
         'student': student,
         'user': user,
@@ -233,15 +237,16 @@ def status_training(request, id):
 
 @staff_member_required
 def show_certificate(request, id):
-    graduate = get_object_or_404(Graduate, id=id)
+    graduate = get_object_or_404(Certificate, id=id)
     force = False
 
     if request.GET.get('regenerate') and request.GET['regenerate'] == 'yes':
         force = True
 
-    graduate.generate_certificate_file(force)
+    graduate.generate()
     context = {
-        'title': f'Certificate {graduate.certificate_number}',
+        'title': f'Certificate',
+        'menu_active': 'graduates',
         'graduate': graduate
     }
     return render(request, 'backoffice/graduates/show_certificate.html',
@@ -261,6 +266,7 @@ def add_training_material(request, id):
 
     context = {
         'title': f'Tambah Materi ke {user.name}',
+        'menu_active': 'graduates',
         'custom_button_title': 'Tambah',
         'form': form
     }
@@ -295,3 +301,22 @@ def change_is_channeled(request):
         'message': 'Berhasil Ubah Status'
     }
     return JsonResponse(data)
+
+
+@staff_member_required
+def add_rating(request, id):
+    graduate = get_object_or_404(Graduate, id=id)
+    form = RatingForm(request.POST or None)
+
+    if form.is_valid():
+        rating = form.save(commit=False)
+        rating.graduate = graduate
+        rating.save()
+        messages.success(request, "Berhasil tambah rating")
+        return redirect('backoffice:graduates:index')
+
+    context = {
+        'title': 'Tambah Rating',
+        'form': form,
+    }
+    return render(request, 'backoffice/form.html', context)

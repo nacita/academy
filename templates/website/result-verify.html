@@ -44,6 +44,22 @@
                             </strong>
                         </td>
                     </tr>
+                    <tr>
+                        <td class="pull-right">
+                            Rating :
+                        </td>
+                        <td>
+                            <strong style="font-weight: bold;">
+                                &nbsp;&nbsp;&nbsp;
+                                {% if result.rating_accumulation %}
+                                    {{ result.rating_stars|safe }}
+                                    {{ result.rating_accumulation }} - dari {{ result.rating_respondents }} responden
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </strong>
+                        </td>
+                    </tr>
                 </table>
             </div>
         </div>

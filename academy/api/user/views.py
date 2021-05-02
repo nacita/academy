@@ -1,6 +1,9 @@
 from rest_framework import status
 from rest_framework.response import Response
 
+from academy.apps.students.models import Training
+from academy.website.accounts.forms import StudentForm
+
 from academy.api.authentications import UserAuthAPIView
 from academy.api.response import ErrorResponse
 from academy.api.serializers import user_profile, training_material, graduate_data
@@ -11,7 +14,7 @@ from academy.website.accounts.forms import ProfileForm, SurveyForm
 from django.contrib.auth.forms import PasswordChangeForm
 
 
-class GetProfileView(UserAuthAPIView):
+class ProfileView(UserAuthAPIView):
 
     def get(self, request):
         return Response(user_profile(request.user), status=status.HTTP_200_OK)
@@ -26,7 +29,16 @@ class GetProfileView(UserAuthAPIView):
             form = ProfileForm(data=request.data, files=request.FILES, cv_required=False)
 
         if form.is_valid():
-            form.save(request.user)
+            profile = form.save(request.user)
+
+            # if not object student, create student
+            if not profile.user.get_student():
+                training = Training.get_or_create_initial()
+
+                form_student = StudentForm(data={'user': profile.user.id, 'training': training.id})
+                if form_student.is_valid():
+                    form_student.save()
+
             return Response(user_profile(request.user))
         return ErrorResponse(form)
 
@@ -83,12 +95,17 @@ class MaterialsView(UserAuthAPIView):
         user = request.user
         student = user.get_student()
 
-        training_materials = student.training.materials.prefetch_related('training_status')
-        return Response({
-            "data": [
-                training_material(materi, user) for materi in training_materials
-            ]
-        })
+        if student:
+            training_materials = student.get_training_materials()
+        else:
+            training_materials = None
+
+        if training_materials:
+            data = [training_material(materi, user) for materi in training_materials]
+        else:
+            data = []
+
+        return Response({"data": data})
 
 
 class GetGraduateView(UserAuthAPIView):

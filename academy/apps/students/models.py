@@ -1,3 +1,5 @@
+import django_rq
+
 from django.db import models
 from django.core.cache import cache
 from django.db.models import Q
@@ -8,6 +10,8 @@ from django.contrib.auth import get_user_model
 
 from model_utils import Choices
 from post_office import mail
+
+from academy.core.email_utils import construct_email_args
 
 
 def get_sentinel_user():
@@ -21,20 +25,34 @@ class Training(models.Model):
     is_active = models.BooleanField(default=True)
     materials = models.ManyToManyField('TrainingMaterial', blank=True,
                                        related_name='trainings')
+    link_group = models.URLField(blank=True, max_length=255)
 
     def __str__(self):
         return f"Batch {self.batch}"
 
+    @classmethod
+    def get_or_create_initial(cls):
+        training = cls.objects.filter(is_active=True) \
+            .exclude(batch__contains='NSC').order_by('batch').last()
+        if not training:
+            training = cls.objects.create(batch="0")
+        return training
+
 
 class StudentManager(models.Manager):
     def participants(self):
-        participants = self.exclude(Q(user__is_superuser=True) | Q(status=Student.STATUS.selection))
-        return participants
+        return self.exclude(
+            Q(user__is_superuser=True) | Q(status=Student.STATUS.selection)
+        )
 
     def graduated(self):
         graduated = self.exclude(user__is_superuser=True) \
             .filter(status=Student.STATUS.graduate)
         return graduated
+
+    def pre_test(self):
+        return self.exclude(user__is_superuser=True) \
+            .filter(status=Student.STATUS.pre_test)
 
 
 class Student(models.Model):
@@ -44,6 +62,7 @@ class Student(models.Model):
                                  null=True, on_delete=models.SET_NULL)
     STATUS = Choices(
         (1, 'selection', _('Selection')),
+        (5, 'pre_test', _('Pre-Test')),
         (2, 'participants', _('Participants')),
         (3, 'repeat', _('Repeat')),
         (4, 'graduate', _('Graduate'))
@@ -58,10 +77,17 @@ class Student(models.Model):
 
     def notification_status(self):
         from academy.apps.accounts.models import Inbox
-        
+
+        # get setting appearance
+        from academy.apps.offices import utils
+        sett = utils.get_settings(serializer=True)
+
         if self.status == self.STATUS.participants:
             template = 'emails/change_to_participant.html'
             title = 'Selamat, Anda menjadi peserta'
+        elif self.status == self.STATUS.pre_test:
+            template = 'emails/change_to_pre_test.html'
+            title = 'Selamat, Anda Mengikuti Test'
         elif self.status == self.STATUS.graduate:
             template = 'emails/change_to_graduate.html'
             title = 'Selamat, Anda lulus'
@@ -72,25 +98,34 @@ class Student(models.Model):
         data = {
             'host': settings.HOST,
             'user': self.user,
+            'link_group': self.training.link_group,
             'email_title': title,
             'graduate': status['graduate'],
             'indicator': settings.INDICATOR_GRADUATED
         }
+        data.update(sett)
 
-        html_message=render_to_string(template, context=data)
-        Inbox.objects.create(user=self.user, subject=title, content=html_message)
+        html_message = render_to_string(template, context=data)
+        inbox = Inbox.objects.create(user=self.user, subject=title, content=html_message)
+        inbox.send_notification(subject_as_content=True, send_email=False)
 
-        send = mail.send(
-            [self.user.email],
-            settings.DEFAULT_FROM_EMAIL,
+        kwargs = construct_email_args(
+            recipients=[self.user.email],
             subject=title,
-            html_message=html_message
+            content=html_message
         )
-        return send
+        django_rq.enqueue(mail.send, **kwargs)
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
         cache.delete(f'student-{self.user.id}')
+
+    def get_training_materials(self):
+        if hasattr(self, 'graduate'):
+            training_materials = self.user.get_training_materials()
+        else:
+            training_materials = self.training.materials.prefetch_related('training_status')
+        return training_materials
 
 
 class TrainingMaterial(models.Model):
@@ -107,7 +142,7 @@ class TrainingMaterial(models.Model):
 class TrainingStatus(models.Model):
     training_material = models.ForeignKey(
         'students.TrainingMaterial', related_name='training_status',
-        null=True, on_delete=models.SET_NULL
+        null=True, on_delete=models.CASCADE
     )
     STATUS = Choices(
         (1, 'not_yet', _('Not Yet')),

@@ -7,8 +7,11 @@ from django.shortcuts import render, redirect, get_object_or_404
 from academy.apps.accounts.models import User
 from academy.apps.students.models import Student, Training
 from academy.core.utils import pagination
-from .forms import (BaseFilterForm, ParticipantsFilterForm, ChangeStatusTraining,
-                    BaseStatusTrainingFormSet, TrainingForm, StudentForm, ChangeStatusForm, ChangeToParticipantForm)
+from .forms import (
+    BaseFilterForm, ParticipantsFilterForm, ChangeStatusTraining,
+    BaseStatusTrainingFormSet, TrainingForm, StudentForm, ChangeStatusForm, 
+    ChangeToParticipantForm, LastLoginForm
+)
 
 
 @staff_member_required
@@ -34,7 +37,7 @@ def index(request):
 
     context = {
         'title': 'Pengguna',
-        'page_active': 'user',
+        'menu_active': 'user',
         'users': users,
         'form': form,
         'user_count': user_count,
@@ -55,7 +58,7 @@ def details(request, id):
 
     context = {
         'user': user,
-        'page_active': 'user',
+        'menu_active': 'user',
         'title': 'User Detail',
         'survey': survey,
         'student': user.get_student(),
@@ -89,7 +92,7 @@ def participants(request):
 
     context = {
         'title': 'Peserta',
-        'page_active': 'participants',
+        'menu_active': 'user',
         'users': users,
         'form': form,
         'user_count': user_count,
@@ -106,14 +109,37 @@ def change_to_participant(request, id):
     user = get_object_or_404(User, id=id)
     student = user.get_student()
 
-    if student.status == Student.STATUS.selection:
+    if student.status == Student.STATUS.selection or \
+            student.status == Student.STATUS.pre_test:
         form = ChangeToParticipantForm(request.POST or None)
 
         if form.is_valid():
-            form.save(student)
-
-            messages.success(request, 'Status berhasil diubah menjadi peserta')
+            training = form.cleaned_data['training']
+            batch = Training.objects.get(id=training.id)
+            if batch.link_group:
+                form.save(student)
+                messages.success(request, 'Status berhasil diubah menjadi peserta')
+            else:
+                messages.error(request, 'Tidak dapat mengubah status menjadi peserta, karena link grup \
+                pada batch ini masih kosong')
             return redirect('backoffice:users:details', id=user.id)
+
+    messages.success(request, 'Maaf, pengguna ini sudah menjadi peserta atau sudah lulus')
+    return redirect('backoffice:users:index')
+
+
+@staff_member_required
+def change_to_pre_test(request, id):
+    user = get_object_or_404(User, id=id)
+    student = user.get_student()
+
+    if student.status == Student.STATUS.selection or \
+            student.status == Student.STATUS.pre_test:
+        student.status = Student.STATUS.pre_test
+        student.save()
+        student.notification_status()
+        messages.success(request, 'Status berhasil diubah menjadi pre-test')
+        return redirect('backoffice:users:details', id=user.id)
 
     messages.success(request, 'Maaf, pengguna ini sudah menjadi peserta atau sudah lulus')
     return redirect('backoffice:users:index')
@@ -165,6 +191,7 @@ def batch_training(request):
 
     context = {
         'form': form,
+        'menu_active': 'batch',
         'title': 'Tambah Angkatan',
         'trainings': trainings
     }
@@ -186,6 +213,7 @@ def edit_batch_training(request, id):
     context = {
         'form': form,
         'title': 'Edit Angkatan',
+        'menu_active': 'batch',
         'trainings': trainings
     }
 
@@ -205,6 +233,7 @@ def edit_student_batch(request, student_id):
     context = {
         'form': form,
         'title': 'Ubah Data Angkatan',
+        'menu_active': 'batch',
         'title_extra': student.user.name,
     }
 
@@ -228,3 +257,35 @@ def edit_status(request, student_id):
     }
 
     return render(request, 'backoffice/form.html', context)
+
+
+@staff_member_required
+def last_login(request):
+    user_list = User.objects.exclude(is_superuser=True).exclude(is_staff=True)
+    user_count = user_list.count()
+
+    download = request.GET.get('download', '')
+    form = LastLoginForm(request.GET or None)
+    if form.is_valid():
+        user_list = form.get_data()
+        if download:
+            csv_buffer = form.generate_to_csv()
+            response = HttpResponse(csv_buffer.getvalue(), content_type="text/csv")
+            response['Content-Disposition'] = 'attachment; filename=daftar-pengguna.csv'
+            return response
+
+    page = request.GET.get('page', 1)
+    users, page_range = pagination(user_list, page)
+
+    context = {
+        'title': 'Pengguna Masuk Terakhir',
+        'menu_active': 'user',
+        'users': users,
+        'form': form,
+        'user_count': user_count,
+        'filter_count': user_list.count(),
+        'query_params': 'start_date=%s&end_date=%s' % (
+            request.GET.get('start_date', ''), request.GET.get('end_date', '')),
+        'page_range': page_range
+    }
+    return render(request, 'backoffice/users/last-login.html', context)

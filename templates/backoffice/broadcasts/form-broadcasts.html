@@ -1,0 +1,62 @@
+{% extends 'backoffice/base-adminlte.html' %}
+{% load static form_tags tags_students %}
+
+{% block extra_css %}
+    {{ block.super }}
+    <link href="{% static 'website/css/select2.min.css' %}" rel="stylesheet"/>
+{% endblock %}
+
+{% block content %}
+    <div class="col-md-12 card">
+        <div class="card-header">
+            <h4 class="fa-pull-left">
+                {{ title }}
+            </h4>
+        </div>
+        <div class="card-body">
+            <div class="row-fluid">
+                <div class="row">
+                    <div class=" col-md-12 col-lg-12 ">
+                        <h5>{{ title_extra }}</h5>
+                    </div>
+                    <div class=" col-md-12 col-lg-12 ">
+                        <div class="tab-content">
+
+                            <form action="" method="post" enctype="multipart/form-data" id="broadcastForm">
+                                {% csrf_token %}
+                                
+                                <span class="text-danger">{{ form.non_field_errors }}</span>
+                                {% for field in form %}
+                                    <div class="form-group col-md-12">
+                                        {% if field.name != 'via' %}
+                                            <label>{{ field.label }}</label><br>
+                                            {{ field|addclass:"form-control" }}
+                                        {% else %}
+                                            <label>{{ field.label }}</label><br>
+                                            {{ field }}
+                                        {% endif %}
+                                        <small class="text-info">{{ field.help_text|safe }}</small>
+                                        <span class="text-danger">{{ field.errors }}</span>
+                                    </div>
+                                {% endfor %}
+
+                                <div class="form-group col-md-12">
+                                    <button class="btn btn-primary btn-pill" type="submit">Simpan</button>
+                                </div>
+                            </form>
+                            
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer"></div>
+
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    {{ block.super }}
+    <script type="text/javascript" src="{% static 'ckeditor/ckeditor-init.js' %}"></script>
+    <script type="text/javascript" src="{% static 'ckeditor/ckeditor/ckeditor.js' %}"></script>
+{% endblock %}

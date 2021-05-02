@@ -4,6 +4,7 @@
   - Python 3.6.x already installed on system or using virtualenv
   - Postgresql 9.6.x
   - wkhtmltopdf 0.12.3
+  - Redis Server 3.0 or latter
 
 ## Development Setup
 Install dependencies
@@ -18,7 +19,7 @@ Create your own settings and modify as your preference
 $ cp academy/local_settings.py.sample academy/local_settings.py
 ```
 
-Configure database connection in `local_settings.py` with the database, database user, and database password you configure in postgreSQL.
+Configure database connection in `local_settings.py` with the database, database user, redis cookies domain and database password you configure in postgreSQL.
 
 Migrate database
 
@@ -26,10 +27,22 @@ Migrate database
 $ python manage.py migrate
 ```
 
+Run this command to seeding initial data settings
+
+```
+$ python manage.py seeding_initial_settings
+```
+
 Collect Static
 
 ```
 $ python manage.py collectstatic
+```
+
+Compress Static File
+
+```
+$ python manage.py compress --force
 ```
 
 Create superuser
@@ -111,6 +124,7 @@ Then create systemd file, just copy sample file and modify as your preference
 
 ```
 $ sudo cp scripts/etc/systemd/system/academy.service /etc/systemd/system/
+$ sudo cp scripts/etc/systemd/system/rqworker.service /etc/systemd/system/
 ```
 
 
@@ -136,7 +150,10 @@ $ mkdir logs
 Then start the service
 
 ```
+$ sudo systemctl enable academy
 $ sudo systemctl start academy
+$ sudo systemctl enable rqworker
+$ sudo systemctl start rqworker
 $ sudo systemctl restart nginx
 ```
 
@@ -153,6 +170,7 @@ $ source env/bin/activate
 $ git pull origin master
 $ python manage.py migrate
 $ python manage.py collectstatic
+$ update_setting.sh dev/prod
 $ sudo systemctl restart academy
 ```
 

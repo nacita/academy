@@ -1,8 +1,13 @@
 import datetime
 import feedparser
-from typing import List
+import jwt
+import requests
+
+from django.conf import settings
+from django.contrib.auth import get_user_model
 
 from django.utils import timezone
+from django.utils.text import slugify
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 
@@ -71,3 +76,71 @@ def get_feed_blog(url: str, limit: int = 10) -> dict:
         "posts": posts[:limit]
     }
     return data
+
+
+def generate_unique_slug(klass, field):
+    """
+    return unique slug if origin slug is exist.
+    eg: `foo-bar` => `foo-bar-1`
+
+    :param `klass` is Class model.
+    :param `field` is specific field for title.
+    """
+    origin_slug = slugify(field)
+    unique_slug = origin_slug
+    numb = 1
+    while klass.objects.filter(slug=unique_slug).exists():
+        unique_slug = '%s-%d' % (origin_slug, numb)
+        numb += 1
+    return unique_slug
+
+
+def sync_keycloak_user(id_token_object):
+    UserModel = get_user_model()
+
+    if getattr(settings, "KEYCLOAK_USE_PREFERRED_USERNAME", False):
+        username = id_token_object['preferred_username']
+    else:
+        username = id_token_object['sub']
+
+    if getattr(settings, "KEYCLOAK_USE_EMAIL_AS_USER_KEY", False):
+        user, _ = UserModel.objects.update_or_create(
+            email=id_token_object.get('email', ''),
+            defaults={
+                'username': username,
+                'first_name': id_token_object.get('given_name', ''),
+                'last_name': id_token_object.get('family_name', '')
+            }
+        )
+    else:
+        user, _ = UserModel.objects.update_or_create(
+            username=id_token_object.get('email', ''),
+            defaults={
+                'email': id_token_object.get('email', ''),
+                'first_name': id_token_object.get('given_name', ''),
+                'last_name': id_token_object.get('family_name', '')
+            }
+        )
+
+    return user
+
+
+def call_internal_api(method, url, **kwargs):
+    method_map = {
+        'get': requests.get,
+        'post': requests.post,
+        'put': requests.put,
+        'patch': requests.patch,
+        'delete': requests.delete
+    }
+
+    payload = jwt.encode({
+        'server_key': settings.SERVER_KEY,
+        'exp': datetime.datetime.utcnow() + datetime.timedelta(seconds=30)
+    }, settings.SECRET_KEY).decode('utf-8')
+
+    headers = {
+        "authorization": f'Server {payload}'
+    }
+
+    return method_map[method](url, headers=headers, **kwargs)

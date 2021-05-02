@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
-from .models import User, Profile, Instructor, Inbox
+from .models import User, Profile, Instructor, Inbox, Certificate
 
 
 class UserAdmin(DjangoUserAdmin):
@@ -16,7 +16,7 @@ class UserAdmin(DjangoUserAdmin):
         ('Important dates', {'fields': ('last_login', 'date_joined')}),
     )
 
-    list_display = ('username', 'email', 'is_active', 'is_staff', 'registered_via', 'has_valid_email')
+    list_display = ('username', 'email', 'is_active', 'is_staff', 'role', 'registered_via', 'has_valid_email')
 
 
 class UserProfile(admin.ModelAdmin):
@@ -28,10 +28,17 @@ class InstructorAdmin(admin.ModelAdmin):
 
 
 class InboxAdmin(admin.ModelAdmin):
-    search_fields = ('user__username','subject',)
+    search_fields = ('user__username', 'subject',)
     list_display = ('user', 'subject', 'is_read', 'sent_date')
+
+
+class CertificateAdmin(admin.ModelAdmin):
+    search_fields = ('user__username', 'number',)
+    list_display = ('user', 'number', 'title')
+
 
 admin.site.register(User, UserAdmin)
 admin.site.register(Profile, UserProfile)
 admin.site.register(Instructor, InstructorAdmin)
 admin.site.register(Inbox, InboxAdmin)
+admin.site.register(Certificate, CertificateAdmin)

@@ -23,4 +23,10 @@ urlpatterns = [
     path('', include('academy.website.urls', namespace='website')),
     path('backoffice/', include('academy.backoffice.urls', namespace='backoffice')),
     path('api/', include('academy.api.urls', namespace='api')),
+    path('auth/', include('django_keycloak.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+urlpatterns += [
+    path('django-rq/', include('django_rq.urls')),
+    path('ckeditor/', include('ckeditor_uploader.urls')),
+]

@@ -31,6 +31,7 @@ class BaseFilterForm(forms.Form):
     STATUS = Choices(
         ('', 'none', '-- Pilih --'),
         (1, 'selection', 'Seleksi'),
+        (5, 'pre_test', 'Pre-Test'),
         (2, 'participants', 'Peserta'),
         (3, 'repeat', 'Mengulang'),
         (4, 'graduate', 'Lulus'),
@@ -185,10 +186,11 @@ class DateInput(forms.DateInput):
 class TrainingForm(forms.ModelForm):
     class Meta:
         model = Training
-        fields = ('batch', 'materials', 'start_date', 'end_date')
+        fields = ('batch', 'materials', 'link_group', 'start_date', 'end_date')
         labels = {
             'batch': 'Angkatan',
             'materials': 'Materi Pelatihan',
+            'link_group': 'Link Grup Telegram',
             'start_date': 'Tanggal Mulai',
             'end_date': 'Tanggal Akhir'
         }
@@ -199,6 +201,7 @@ class TrainingForm(forms.ModelForm):
         help_texts = {
             'start_date': 'Boleh kosong',
             'end_date': 'Boleh kosong',
+            'link_group': 'Boleh kosong',
             'materials': '',
             'batch': 'Gunakan awalan NSC- jika akan membuat angkatan baru untuk NolSatu Kampus, mis. NSC-1'
         }
@@ -216,6 +219,7 @@ class StudentForm(forms.ModelForm):
 class ChangeStatusForm(forms.ModelForm):
     STATUS = Choices(
         (1, 'selection', 'Seleksi'),
+        (5, 'pre_test', 'Pre-Test'),
         (2, 'participants', 'Peserta'),
         (3, 'repeat', 'Mengulang')
     )
@@ -234,3 +238,74 @@ class ChangeToParticipantForm(forms.Form):
         student.training = self.cleaned_data['training']
         student.save()
         student.notification_status()
+
+
+class LastLoginForm(forms.Form):
+    start_date_time = forms.DateTimeField(
+        input_formats=["%Y-%m-%d %H:%M"], label="Tanggal Mulai", required=False,
+        widget=forms.TextInput(attrs={'placeholder': 'Tanggal Mulai'}),
+    )
+    end_date_time = forms.DateTimeField(
+        input_formats=["%Y-%m-%d %H:%M"], label="Tanggal Akhir", required=False,
+        widget=forms.TextInput(attrs={'placeholder': 'Tanggal Akhir'}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        self.users = None
+        super().__init__(*args, **kwargs)
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        if self.errors:
+            return cleaned_data
+
+        start_date_time = cleaned_data['start_date_time']
+        end_date_time = cleaned_data['end_date_time']
+
+        if not start_date_time or not end_date_time:
+            return cleaned_data
+
+        if start_date_time > end_date_time:
+            self.add_error('start_date_time', "Tanggal mulai tidak bisa lebih dari tanggal akhir")
+
+        today = timezone.now()
+
+        if start_date_time > today:
+            self.add_error('start_date_time', "Tanggal mulai tidak boleh lebih hari ini")
+
+        if end_date_time > today:
+            self.add_error('end_date_time', "Tanggal Akhir tidak boleh lebih dari hari ini")
+
+        return cleaned_data
+
+    def get_data(self):
+        start_date_time = self.cleaned_data['start_date_time']
+        end_date_time = self.cleaned_data['end_date_time']
+
+        users = User.objects.exclude(is_superuser=True).exclude(is_staff=True)
+
+        if start_date_time and end_date_time:
+            start, end = normalize_datetime_range(start_date_time, end_date_time)
+            users = users.filter(date_joined__range=(start, end))
+
+        self.users = users
+        return self.users
+
+    def generate_to_csv(self):
+        csv_buffer = StringIO()
+        writer = csv.writer(csv_buffer)
+        writer.writerow([
+            'No.', 'Name', 'Username', 'Email', 'Masuk Terakhir'
+        ])
+
+        for index, user in enumerate(self.users, 1):
+            if user.last_login:
+                last_login = user.last_login.strftime("%d-%m-%Y %H:%M:%S")
+            else:
+                last_login = "-"
+
+            writer.writerow([
+                index, user.name, user.username, user.email, last_login
+            ])
+        return csv_buffer

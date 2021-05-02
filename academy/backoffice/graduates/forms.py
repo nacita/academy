@@ -1,4 +1,5 @@
 import csv
+import django_rq
 
 from io import StringIO
 
@@ -12,8 +13,9 @@ from django.urls import reverse
 from academy.backoffice.users.forms import BaseStatusTrainingFormSet
 from academy.apps.students.models import Student, Training, TrainingStatus, TrainingMaterial
 from academy.apps.accounts.models import User, Inbox
+from academy.core.email_utils import construct_email_args
 from academy.core.fields import TrainingMaterialField
-from academy.apps.graduates.models import Graduate
+from academy.apps.graduates.models import Graduate, Rating
 
 from post_office import mail
 from model_utils import Choices
@@ -51,6 +53,10 @@ class ParticipantsRepeatForm(forms.Form):
         return batch
 
     def send_notification(self):
+        # get setting appearance
+        from academy.apps.offices import utils
+        sett = utils.get_settings(serializer=True)
+
         title = "Maaf, Anda belum bisa lanjut"
 
         context = {
@@ -58,23 +64,24 @@ class ParticipantsRepeatForm(forms.Form):
             'email_title': title,
             'indicator': settings.INDICATOR_GRADUATED
         }
+        context.update(sett)
 
         for data in self.users_repeat:
             context['user'] = data['user']
             context['graduate'] = data['status']['graduate']
-            html_message=render_to_string('emails/participants_repeat.html', context=context)
+            html_message = render_to_string('emails/participants_repeat.html', context=context)
 
             Inbox.objects.create(user=data['user'], subject=title, content=html_message)
 
-            mail.send(
-                data['user'].email,
-                settings.DEFAULT_FROM_EMAIL,
+            kwargs = construct_email_args(
+                recipients=data['user'].email,
                 subject=title,
-                html_message=html_message
+                content=html_message
             )
             student = data['user'].get_student()
             student.status = Student.STATUS.repeat
             student.save(update_fields=['status'])
+            django_rq.enqueue(mail.send, **kwargs)
 
         return len(self.users_repeat)
 
@@ -210,3 +217,13 @@ class GraduateHasChanneledForm(forms.Form):
         graduate.channeled_at = cleaned_data['channeled_at']
         graduate.is_channeled = True
         graduate.save()
+
+
+class RatingForm(forms.ModelForm):
+
+    class Meta:
+        model = Rating
+        exclude = ('graduate',)
+        help_texts = {
+            'respondent_name': 'Nama reponden bisa perusahaan, personal, atau jabatan.'
+        }
